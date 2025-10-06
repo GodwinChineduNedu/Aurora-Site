@@ -2,20 +2,46 @@ name: CI & Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+
+env:
+  WORKDIR: '.'    # change to ./path/to/project if package.json is in a subfolder
+  NODE_VERSION: '18'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - run: npm ci
-      - run: npm run build
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Show Node/npm versions
+        run: |
+          node -v || true
+          npm -v || true
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Lockfile found, using npm ci"
+            npm ci
+          else
+            echo "No lockfile: running npm install"
+            npm install
+          fi
+
+      - name: Build
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          echo "Running npm run build in $(pwd)"
+          npm run build
 
   deploy:
     needs: build
@@ -27,4 +53,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public   # adjust for your build output folder
+          publish_dir: ./public   # change to ./dist or ./build if your site uses those
+YAML
+
