@@ -8,9 +8,9 @@ on:
     branches: [ main, develop ]
 
 env:
-  WORKDIR: '.'         
+  WORKDIR: './MyResume-1.0.0'         
   NODE_VERSION: '18'
-  PUBLISH_DIR: './public'   
+  PUBLISH_DIR: './MyResume-1.0.0/public'   
 
 jobs:
   build:
