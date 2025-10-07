@@ -1,0 +1,81 @@
+# .github/workflows/ci-deploy.yml
+name: CI & Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  WORKDIR: '.'         
+  NODE_VERSION: '18'
+  PUBLISH_DIR: './public'   
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Show environment
+        run: |
+          echo "WORKDIR=${WORKDIR}"
+          node -v || echo "node not found"
+          npm -v || echo "npm not found"
+          ls -la ${{ env.WORKDIR }}
+
+      - name: Install dependencies (use ci if lockfile exists, else install)
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          echo "Checking for lockfiles..."
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ] || [ -f pnpm-lock.yaml ]; then
+            echo "Lockfile detected."
+          else
+            echo "No lockfile detected."
+          fi
+
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Using npm ci (lockfile present)"
+            npm ci
+          else
+            echo "No npm lockfile: falling back to npm install"
+            npm install
+          fi
+
+      - name: Run build
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          echo "Running build script (npm run build)"
+          npm run build
+
+      - name: Upload production-ready build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ env.PUBLISH_DIR }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: ./public
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
