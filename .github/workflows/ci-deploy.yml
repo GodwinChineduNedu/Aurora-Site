@@ -1,7 +1,6 @@
 # .github/workflows/ci-deploy.yml
 name: CI & Deploy
 
-# Trigger on push and PR to main and develop (you can remove develop if not needed)
 on:
   push:
     branches: [ main, develop ]
@@ -9,9 +8,9 @@ on:
     branches: [ main, develop ]
 
 env:
-  WORKDIR: '.'         # change to './site' or './your-subfolder' if package.json is not at repo root
+  WORKDIR: '.'         
   NODE_VERSION: '18'
-  PUBLISH_DIR: './public'   # change to ./dist or ./build if your build output differs
+  PUBLISH_DIR: './public'   
 
 jobs:
   build:
@@ -20,9 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          # allow pushing from workflow if you enable auto-commit (disabled by default)
-          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,7 +43,6 @@ jobs:
             echo "No lockfile detected."
           fi
 
-          # prefer npm ci when package-lock.json or npm-shrinkwrap.json exists
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
             echo "Using npm ci (lockfile present)"
             npm ci
@@ -62,17 +57,25 @@ jobs:
           echo "Running build script (npm run build)"
           npm run build
 
+      - name: Upload production-ready build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ env.PUBLISH_DIR }}
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    # Only deploy when pushing to main (prevents deploy from develop)
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout code (for deploy)
-        uses: actions/checkout@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: ./public
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ${{ env.PUBLISH_DIR }}
+          publish_dir: ./public
